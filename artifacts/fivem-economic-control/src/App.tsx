@@ -3,9 +3,9 @@ import {
   Activity, Anchor, ArrowDownRight, ArrowUpRight, BarChart3, Bell, Boxes,
   BriefcaseBusiness, Building2, CalendarClock, ChevronDown, CircleDollarSign,
   CircleGauge, ClipboardList, Clock3, Container, Download, Gauge, Landmark,
-  Layers3, MapPin, Menu, Minus, Package, PanelLeft, Plus, RefreshCw,
+  Layers3, Menu, Package, PanelLeft, RefreshCw,
   Route as RouteIcon, Search, Settings2, Ship, ShipWheel, SlidersHorizontal,
-  Sparkles, TrendingDown, TrendingUp, WalletCards, Warehouse, Waves, X, Zap,
+  TrendingDown, TrendingUp, WalletCards, Warehouse, Waves, X, Zap,
 } from 'lucide-react';
 import * as L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -20,7 +20,6 @@ const queryClient = new QueryClient();
 
 type Tone = 'teal' | 'amber' | 'blue' | 'red' | 'slate';
 type Tab = 'overview' | 'economy' | 'traffic' | 'warehouse' | 'activity';
-type Scenario = 'stable' | 'growth' | 'shock';
 
 type CargoDefinition = {
   name: string;
@@ -83,7 +82,6 @@ type EconomyState = {
   prices: Record<string, number>;
   demand: Record<string, number>;
   trend: number[];
-  lastScenario: Scenario;
   updatedAt?: number;
 };
 
@@ -184,7 +182,6 @@ const defaultEconomy: EconomyState = {
   prices: {},
   demand: {},
   trend: [96, 98, 97, 100, 101, 103, 104.8],
-  lastScenario: 'stable',
   updatedAt: Date.now(),
 };
 
@@ -290,36 +287,6 @@ function applyServerState(serverState: ServerState) {
   };
 }
 
-function applyScenario(treasury: Treasury, economy: EconomyState, scenario: Scenario) {
-  const modifiers: Record<Scenario, { income: number; expense: number; volume: number; index: number; label: string }> = {
-    stable: { income: 12000, expense: 5400, volume: 46000, index: 0.8, label: 'Stabile Nachfrage' },
-    growth: { income: 42000, expense: 12800, volume: 128000, index: 3.4, label: 'Handelsboom' },
-    shock: { income: -18000, expense: 36000, volume: -84000, index: -4.8, label: 'Versorgungsengpass' },
-  };
-  const modifier = modifiers[scenario];
-  const balanceDelta = modifier.income - modifier.expense;
-  return {
-    treasury: {
-      ...treasury,
-      balance: Math.max(0, treasury.balance + balanceDelta),
-      changeToday: treasury.changeToday + balanceDelta,
-      incomeToday: Math.max(0, treasury.incomeToday + modifier.income),
-      expenseToday: Math.max(0, treasury.expenseToday + modifier.expense),
-      trend: [...treasury.trend.slice(-6), Math.max(0, treasury.balance + balanceDelta)],
-    },
-    economy: {
-      ...economy,
-      marketIndex: Math.max(40, economy.marketIndex + modifier.index),
-      tradeVolumeToday: Math.max(0, economy.tradeVolumeToday + modifier.volume),
-      taxRevenueToday: Math.max(0, economy.taxRevenueToday + Math.round(modifier.income * 0.08)),
-      trend: [...economy.trend.slice(-6), Math.max(40, economy.marketIndex + modifier.index)],
-      lastScenario: scenario,
-      updatedAt: Date.now(),
-    },
-    label: modifier.label,
-  };
-}
-
 function IconButton({ label, children, onClick, className = '' }: { label: string; children: ReactNode; onClick?: () => void; className?: string }) {
   return <button type="button" aria-label={label} onClick={onClick} className={`inline-flex items-center justify-center rounded-lg border border-[#253336] bg-[#0d1314] text-[#9bb3b2] transition hover:border-[#3b7770] hover:bg-[#122322] hover:text-[#d8e8e5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#39b9aa] ${className}`}>{children}</button>;
 }
@@ -410,38 +377,33 @@ function MarketTable({ stocks, economy, limit }: { stocks: Stock[]; economy: Eco
   return <div className="overflow-x-auto"><div className="min-w-[720px]"><div className="grid grid-cols-[1.5fr_.9fr_.8fr_.8fr_.9fr] border-b border-[#1c292b] bg-[#0c1415] px-5 py-2.5 text-[9px] font-bold uppercase tracking-[.12em] text-[#5f7779]"><span>Fracht</span><span>Marktpreis</span><span>Nachfrage</span><span>Bestand</span><span>Trend</span></div>{rows.map((item, index) => { const definition = getDefinition(item.id); const price = economy.prices[item.id] ?? Math.round(definition.basePrice * (1 + ((index % 7) - 3) * definition.volatility / 3)); const demand = economy.demand[item.id] ?? Math.min(99, 44 + ((index * 13) % 53)); const rising = index % 3 !== 1; return <div key={item.id} className="grid grid-cols-[1.5fr_.9fr_.8fr_.8fr_.9fr] items-center border-b border-[#182528] px-5 py-3.5 text-[10px] last:border-0"><div className="flex items-center gap-3"><span className={`flex h-7 w-7 items-center justify-center rounded-md ${definition.tone === 'amber' ? 'bg-[#342515] text-[#e4ad57]' : definition.tone === 'blue' ? 'bg-[#102b39] text-[#70b6d6]' : definition.tone === 'red' ? 'bg-[#351d1b] text-[#e89183]' : 'bg-[#10312e] text-[#50cdbb]'}`}><Package size={14} /></span><div><div className="font-bold text-[#d8e7e4]">{item.name}</div><div className="mt-0.5 text-[9px] text-[#657d7f]">{item.category} · {item.unit}</div></div></div><span className="mono text-[#d8e7e4]">{formatMoney(price)}</span><div className="flex items-center gap-2"><div className="h-1.5 w-16 overflow-hidden rounded-full bg-[#172628]"><div className={`h-full rounded-full ${demand > 75 ? 'bg-[#d99a3c]' : 'bg-[#35b8aa]'}`} style={{ width: `${demand}%` }} /></div><span className="mono text-[#8ca4a4]">{demand}%</span></div><span className="mono text-[#8ca4a4]">{item.qty.toLocaleString('de-DE')}</span><span className={`flex items-center gap-1 font-bold ${rising ? 'text-[#55ccb9]' : 'text-[#e1a34f]'}`}>{rising ? <TrendingUp size={13} /> : <TrendingDown size={13} />}{rising ? '+' : '-'}{(2.2 + index % 5).toFixed(1).replace('.', ',')}%</span></div>; })}</div></div>;
 }
 
-function ScenarioControls({ selected, running, onSelect }: { selected: Scenario; running: boolean; onSelect: (scenario: Scenario) => void }) {
-  const options: Array<{ id: Scenario; label: string; detail: string; tone: Tone }> = [{ id: 'stable', label: 'Stabil', detail: 'Normale Nachfrage', tone: 'teal' }, { id: 'growth', label: 'Wachstum', detail: 'Handelsboom', tone: 'blue' }, { id: 'shock', label: 'Schock', detail: 'Versorgungsengpass', tone: 'amber' }];
-  return <div className="grid gap-2 sm:grid-cols-3">{options.map((option) => <button key={option.id} type="button" disabled={running} onClick={() => onSelect(option.id)} className={`rounded-lg border p-3 text-left transition ${selected === option.id ? 'border-[#3faaa0] bg-[#102e2c]' : 'border-[#253336] bg-[#0d1314] hover:border-[#3f7772]'} disabled:cursor-wait disabled:opacity-60`}><div className="flex items-center justify-between"><span className={`h-2 w-2 rounded-full ${option.tone === 'amber' ? 'bg-[#e4ad57]' : option.tone === 'blue' ? 'bg-[#70b6d6]' : 'bg-[#50cdbb]'}`} /><span className="mono text-[9px] text-[#5e7779]">{selected === option.id ? 'AKTIV' : 'SETZEN'}</span></div><div className="mt-3 text-[11px] font-bold text-[#d8e7e4]">{option.label}</div><div className="mt-1 text-[10px] text-[#71888b]">{option.detail}</div></button>)}</div>;
-}
-
-function Overview({ cargo, stocks, ships, treasury, economy, activity, onScenario }: { cargo: Cargo[]; stocks: Stock[]; ships: Ship[]; treasury: Treasury; economy: EconomyState; activity: ActivityItem[]; onScenario: (scenario: Scenario) => void }) {
+function Overview({ stocks, ships, treasury, economy, activity }: { stocks: Stock[]; ships: Ship[]; treasury: Treasury; economy: EconomyState; activity: ActivityItem[] }) {
   return <div className="space-y-5">
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><MetricCard title="Staatskonto" value={formatMoney(treasury.balance)} caption="verfügbar · laufender Zyklus" change={formatPercent((treasury.changeToday / Math.max(1, treasury.balance)) * 100)} icon={<Landmark size={16} />} /><MetricCard title="Handelsvolumen" value={formatMoney(economy.tradeVolumeToday)} caption="Importe und Exporte · heute" change="+12,6%" icon={<BarChart3 size={16} />} tone="blue" /><MetricCard title="Fracht im Umlauf" value={String(ships.length).padStart(2, '0')} caption={`${stocks.length} Positionen im Lager`} change="LIVE" icon={<ShipWheel size={16} />} tone="amber" /><MetricCard title="Marktindex" value={economy.marketIndex.toFixed(1).replace('.', ',')} caption="Basis 100 · East Basin" change={formatPercent(economy.marketIndex - 100)} icon={<Gauge size={16} />} tone="slate" /></div>
-    <div className="rounded-xl border border-[#245650] bg-[radial-gradient(circle_at_80%_20%,rgba(48,151,137,.18),transparent_35%),#0b1919] p-5 md:p-6"><div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end"><div><div className="mono mb-3 flex items-center gap-2 text-[9px] uppercase tracking-[.18em] text-[#54bcae]"><span className="h-1.5 w-1.5 rounded-full bg-current" /> Simulation aktiv · Serverautorität</div><h2 className="display max-w-[620px] text-2xl font-bold tracking-[-.05em] text-[#eff8f5] md:text-3xl">Wirtschaft unter Kontrolle.</h2><p className="mt-2 max-w-[600px] text-[11px] leading-relaxed text-[#8fb0ac]">Steuere Staatskonto, Handelsströme und Hafenlogistik aus einer Leitstelle. Jede Buchung wird in der FiveM-Resource protokolliert und an alle Clients synchronisiert.</p></div><div className="min-w-[270px] rounded-lg border border-[#24524e] bg-[#0a1717] p-4"><div className="flex items-center justify-between"><div className="flex items-center gap-2 text-[10px] font-bold text-[#b8d5d0]"><Sparkles size={14} className="text-[#5bd4c2]" /> Szenario-Impuls</div><span className="mono text-[9px] text-[#5e8b86]">ADMIN</span></div><div className="mt-3"><ScenarioControls selected={economy.lastScenario} running={false} onSelect={onScenario} /></div></div></div></div>
+     <div className="rounded-xl border border-[#245650] bg-[radial-gradient(circle_at_80%_20%,rgba(48,151,137,.18),transparent_35%),#0b1919] p-5 md:p-6"><div className="mono mb-3 flex items-center gap-2 text-[9px] uppercase tracking-[.18em] text-[#54bcae]"><span className="h-1.5 w-1.5 rounded-full bg-current" /> Serverautorität aktiv</div><h2 className="display max-w-[720px] text-2xl font-bold tracking-[-.05em] text-[#eff8f5] md:text-3xl">Wirtschaft unter Kontrolle.</h2><p className="mt-2 max-w-[680px] text-[11px] leading-relaxed text-[#8fb0ac]">Steuere Staatskonto, Handelsströme und Hafenlogistik aus einer Leitstelle. Jede Buchung wird in der FiveM-Resource protokolliert und an alle Clients synchronisiert.</p></div>
     <div className="grid gap-5 xl:grid-cols-[1.35fr_.65fr]"><Panel testId="panel-treasury"><PanelHeader icon={<WalletCards size={15} />} title="Staatskonto" description="Liquidität der letzten sieben Tage" action={<div className="text-right"><div className="display text-[16px] font-bold text-[#dce9e7]">{formatMoney(treasury.balance)}</div><div className="mt-1 flex items-center justify-end gap-1 text-[10px] font-bold text-[#56cdbc]"><ArrowUpRight size={12} />{formatMoney(treasury.changeToday)}</div></div>} /><TreasuryChart treasury={treasury} /></Panel><Panel><PanelHeader icon={<Waves size={15} />} title="Handelsströme" description="East Basin · heute" /><div className="space-y-4 p-5"><div className="flex items-center justify-between"><span className="text-[10px] text-[#789194]">Importe</span><span className="mono text-[12px] text-[#dce9e7]">{formatMoney(economy.importsToday)}</span></div><div className="h-2 overflow-hidden rounded-full bg-[#172628]"><div className="h-full w-[70%] rounded-full bg-[#4b9ab6]" /></div><div className="flex items-center justify-between"><span className="text-[10px] text-[#789194]">Exporte</span><span className="mono text-[12px] text-[#dce9e7]">{formatMoney(economy.exportsToday)}</span></div><div className="h-2 overflow-hidden rounded-full bg-[#172628]"><div className="h-full w-[30%] rounded-full bg-[#45c4b5]" /></div><div className="mt-5 grid grid-cols-2 gap-3 border-t border-[#1c292b] pt-4"><div><div className="text-[9px] uppercase tracking-[.12em] text-[#60777a]">Hafengebühren</div><div className="mono mt-1 text-[14px] text-[#dce9e7]">{formatMoney(economy.taxRevenueToday)}</div></div><div><div className="text-[9px] uppercase tracking-[.12em] text-[#60777a]">Saldo</div><div className="mono mt-1 text-[14px] text-[#56cdbc]">{formatMoney(economy.exportsToday - economy.importsToday)}</div></div></div></div></Panel></div>
     <div className="grid gap-5 xl:grid-cols-[1.1fr_.9fr]"><Panel><PanelHeader icon={<Ship size={15} />} title="Schiffsverkehr" description="Aktive Routen und nächste Ankünfte" action={<button type="button" className="text-[10px] font-bold text-[#53c8b8] hover:underline">Alle Schiffe →</button>} />{ships.slice(0, 3).map((ship) => <ShipRow key={ship.id} ship={ship} dense />)}</Panel><Panel><PanelHeader icon={<Activity size={15} />} title="Letzte Aktivität" description="Serverseitig protokolliert" action={<Clock3 size={14} className="text-[#5e7779]" />} /><ActivityFeed items={activity} /></Panel></div>
     <Panel><PanelHeader icon={<TrendingUp size={15} />} title="Marktbeobachtung" description="Die wichtigsten Waren im aktuellen Zyklus" action={<span className="mono text-[9px] text-[#5e7779]">TOP 05 / 200</span>} /><MarketTable stocks={stocks} economy={economy} limit={5} /></Panel>
   </div>;
 }
 
-function EconomyView({ stocks, treasury, economy, running, onScenario }: { stocks: Stock[]; treasury: Treasury; economy: EconomyState; running: boolean; onScenario: (scenario: Scenario) => void }) {
-  return <div className="space-y-5"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><MetricCard title="Einnahmen heute" value={formatMoney(treasury.incomeToday)} caption="Gebühren, Steuern, Exporte" change="+8,4%" icon={<TrendingUp size={16} />} /><MetricCard title="Ausgaben heute" value={formatMoney(treasury.expenseToday)} caption="Logistik und Versorgung" change="-2,1%" icon={<TrendingDown size={16} />} tone="amber" /><MetricCard title="Importe" value={formatMoney(economy.importsToday)} caption="Warenzufluss in den Hafen" change="+6,2%" icon={<ArrowDownRight size={16} />} tone="blue" /><MetricCard title="Exporte" value={formatMoney(economy.exportsToday)} caption="Warenabfluss aus dem Hafen" change="+14,1%" icon={<ArrowUpRight size={16} />} /></div><div className="grid gap-5 xl:grid-cols-[.75fr_1.25fr]"><Panel className="p-5"><div className="flex items-start justify-between"><div><div className="flex items-center gap-2 text-[#5ad0c0]"><Sparkles size={15} /><h2 className="text-[13px] font-bold text-[#dce9e7]">Wirtschaft simulieren</h2></div><p className="mt-2 text-[10px] leading-relaxed text-[#71888b]">Ein Szenario verändert Marktindex, Handelsvolumen und Staatskonto. In FiveM wird der Impuls serverseitig gespeichert.</p></div><StatusBadge tone="teal">{running ? 'Berechnung' : 'Bereit'}</StatusBadge></div><div className="mt-5"><ScenarioControls selected={economy.lastScenario} running={running} onSelect={onScenario} /></div><div className="mt-5 grid grid-cols-2 gap-3 border-t border-[#1c292b] pt-4"><div><div className="text-[9px] uppercase tracking-[.12em] text-[#60777a]">Marktindex</div><div className="display mt-1 text-xl font-bold text-[#dce9e7]">{economy.marketIndex.toFixed(1).replace('.', ',')}</div></div><div><div className="text-[9px] uppercase tracking-[.12em] text-[#60777a]">Letzte Aktion</div><div className="mt-2"><StatusBadge tone={economy.lastScenario === 'shock' ? 'amber' : economy.lastScenario === 'growth' ? 'blue' : 'teal'}>{economy.lastScenario}</StatusBadge></div></div></div></Panel><Panel><PanelHeader icon={<BarChart3 size={15} />} title="Marktpreise & Nachfrage" description="Preise sind serverfähig und werden pro Frachtposition geführt" action={<button type="button" className="flex items-center gap-1.5 rounded-lg border border-[#253336] px-3 py-2 text-[10px] font-bold text-[#9bb3b2]"><Download size={13} /> Export</button>} /><MarketTable stocks={stocks} economy={economy} limit={10} /></Panel></div><Panel><PanelHeader icon={<BriefcaseBusiness size={15} />} title="Alle Marktpositionen" description="Such- und Lagerverwaltung findest du im Frachtlager" action={<span className="mono text-[9px] text-[#5e7779]">INDEX / 200</span>} /><MarketTable stocks={stocks} economy={economy} limit={20} /></Panel></div>;
+function EconomyView({ stocks, treasury, economy }: { stocks: Stock[]; treasury: Treasury; economy: EconomyState }) {
+  return <div className="space-y-5"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><MetricCard title="Einnahmen heute" value={formatMoney(treasury.incomeToday)} caption="Gebühren, Steuern, Exporte" change="+8,4%" icon={<TrendingUp size={16} />} /><MetricCard title="Ausgaben heute" value={formatMoney(treasury.expenseToday)} caption="Logistik und Versorgung" change="-2,1%" icon={<TrendingDown size={16} />} tone="amber" /><MetricCard title="Importe" value={formatMoney(economy.importsToday)} caption="Warenzufluss in den Hafen" change="+6,2%" icon={<ArrowDownRight size={16} />} tone="blue" /><MetricCard title="Exporte" value={formatMoney(economy.exportsToday)} caption="Warenabfluss aus dem Hafen" change="+14,1%" icon={<ArrowUpRight size={16} />} /></div><Panel><PanelHeader icon={<BarChart3 size={15} />} title="Marktpreise & Nachfrage" description="Preise werden pro Frachtposition serverseitig geführt" action={<button type="button" className="flex items-center gap-1.5 rounded-lg border border-[#253336] px-3 py-2 text-[10px] font-bold text-[#9bb3b2]"><Download size={13} /> Export</button>} /><MarketTable stocks={stocks} economy={economy} limit={10} /></Panel><Panel><PanelHeader icon={<BriefcaseBusiness size={15} />} title="Alle Marktpositionen" description="200 handelbare Frachtpositionen" action={<span className="mono text-[9px] text-[#5e7779]">INDEX / 200</span>} /><MarketTable stocks={stocks} economy={economy} limit={20} /></Panel></div>;
 }
 
 function TrafficView({ ships }: { ships: Ship[] }) {
   return <div className="space-y-5"><div className="grid gap-3 sm:grid-cols-3"><MetricCard title="Aktive Routen" value={String(ships.length).padStart(2, '0')} caption="Positionen werden live aktualisiert" change="LIVE" icon={<RouteIcon size={16} />} /><MetricCard title="Ankünfte heute" value="07" caption="Nächste Ankunft in 02:14" change="+02" icon={<CalendarClock size={16} />} tone="amber" /><MetricCard title="Routenstatus" value="98,4%" caption="Keine kritischen Verzögerungen" change="+1,8%" icon={<Gauge size={16} />} tone="blue" /></div><div className="grid gap-5 xl:grid-cols-[1.25fr_.75fr]"><Panel className="overflow-hidden"><PanelHeader icon={<RouteIcon size={15} />} title="Live-Karte" description="East Basin · Schiffspositionen und Hafenpunkte" action={<button type="button" className="flex items-center gap-1.5 rounded-lg border border-[#253336] px-3 py-2 text-[10px] font-bold text-[#9bb3b2]"><Layers3 size={13} /> Ebenen</button>} /><LeafletMap visibleShips={ships} /></Panel><Panel><PanelHeader icon={<Ship size={15} />} title="Schiffsregister" description="Manifest und ETA" /><div>{ships.map((ship) => <ShipRow key={ship.id} ship={ship} />)}</div></Panel></div></div>;
 }
 
-function WarehouseView({ stock, onStockChange }: { stock: Stock[]; onStockChange: (id: string, delta: number) => void }) {
+function WarehouseView({ stock }: { stock: Stock[] }) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('Alle');
   const categories = ['Alle', ...Array.from(new Set(stock.map((item) => item.category)))];
-  const filtered = stock.filter((item) => category === 'Alle' || item.category === category).filter((item) => `${item.name} ${item.category} ${item.location}`.toLowerCase().includes(query.toLowerCase()));
+  const filtered = stock.filter((item) => category === 'Alle' || item.category === category).filter((item) => `${item.name} ${item.category}`.toLowerCase().includes(query.toLowerCase()));
   const total = stock.reduce((sum, item) => sum + item.qty, 0);
   const capacity = stock.reduce((sum, item) => sum + item.capacity, 0);
   const reorder = stock.filter((item) => item.qty <= item.reorder).length;
-  return <div className="space-y-5"><div className="grid gap-3 sm:grid-cols-3"><MetricCard title="Gesamtbestand" value={total.toLocaleString('de-DE')} caption={`${stock.length} Frachtpositionen verwaltet`} icon={<Boxes size={16} />} /><MetricCard title="Kapazität" value={`${capacity ? Math.round(total / capacity * 100) : 0}%`} caption="Lagerauslastung East Basin" icon={<Warehouse size={16} />} tone="blue" /><MetricCard title="Nachbestellung" value={String(reorder).padStart(2, '0')} caption="Positionen unter Mindestbestand" icon={<ClipboardList size={16} />} tone="amber" /></div><Panel><div className="flex flex-col justify-between gap-4 border-b border-[#1c292b] px-5 py-4 lg:flex-row lg:items-center"><div><div className="flex items-center gap-2 text-[#5ad0c0]"><Warehouse size={15} /><h2 className="text-[13px] font-bold text-[#dce9e7]">Frachtbestand</h2></div><p className="mt-1 text-[10px] text-[#71888b]">200 handelbare Güter · Bestand, Kapazität und Mindestmengen</p></div><div className="flex flex-wrap items-center gap-2"><label className="flex items-center gap-2 rounded-lg border border-[#253336] bg-[#0d1314] px-3 py-2 text-[10px] text-[#789194]"><Search size={13} /><span className="sr-only">Fracht suchen</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Fracht suchen" className="w-32 bg-transparent text-[#dce9e7] outline-none placeholder:text-[#60777a] sm:w-44" /></label><label className="flex items-center gap-2 rounded-lg border border-[#253336] bg-[#0d1314] px-3 py-2 text-[10px] text-[#789194]"><SlidersHorizontal size={13} /><select value={category} onChange={(event) => setCategory(event.target.value)} className="bg-transparent text-[#dce9e7] outline-none">{categories.map((item) => <option key={item} value={item} className="bg-[#0d1314]">{item}</option>)}</select></label><button type="button" className="hidden items-center gap-1.5 rounded-lg bg-[#2d9e91] px-3 py-2 text-[10px] font-bold text-[#061412] sm:flex"><Plus size={13} /> Neue Lieferung</button></div></div><div className="hidden grid-cols-[1.35fr_1fr_.8fr_1fr_1.1fr] gap-4 border-b border-[#1c292b] bg-[#0c1415] px-5 py-2.5 text-[9px] font-bold uppercase tracking-[.12em] text-[#5f7779] md:grid"><span>Frachtposition</span><span>Lagerort</span><span>Bestand</span><span>Füllstand</span><span>Anpassen</span></div>{filtered.map((item) => <div key={item.id} data-testid={`row-stock-${item.id}`} className="grid gap-3 border-b border-[#182528] px-5 py-4 last:border-0 md:grid-cols-[1.35fr_1fr_.8fr_1fr_1.1fr] md:items-center md:gap-4"><div className="flex items-center gap-3"><div className={`flex h-8 w-8 items-center justify-center rounded-lg ${getDefinition(item.id).tone === 'amber' ? 'bg-[#342515] text-[#e4ad57]' : getDefinition(item.id).tone === 'blue' ? 'bg-[#102b39] text-[#70b6d6]' : 'bg-[#10312e] text-[#50cdbb]'}`}><Package size={14} /></div><div><div className="text-[11px] font-bold text-[#d8e7e4]">{item.name}</div><div className="mt-0.5 text-[10px] text-[#71888b]">{item.category}</div></div></div><div className="flex items-center gap-1.5 text-[10px] text-[#8ca4a4]"><MapPin size={12} className="text-[#5e7779]" />{item.location}</div><div><span className="mono text-[12px] text-[#d8e7e4]">{item.qty.toLocaleString('de-DE')}</span> <span className="text-[10px] text-[#71888b]">{item.unit}</span></div><div><div className="mb-1 flex justify-between text-[9px] text-[#71888b]"><span>{Math.round(item.qty / item.capacity * 100)}% belegt</span>{item.qty <= item.reorder && <span className="font-bold text-[#e4ad57]">Nachbestellen</span>}</div><div className="h-1.5 overflow-hidden rounded-full bg-[#172628]"><div className={`h-full rounded-full ${item.qty <= item.reorder ? 'bg-[#d99a3c]' : 'bg-[#35b8aa]'}`} style={{ width: `${Math.min(100, item.qty / item.capacity * 100)}%` }} /></div></div><div className="flex items-center gap-1"><IconButton label={`Bestand von ${item.name} verringern`} onClick={() => onStockChange(item.id, -1)} className="h-7 w-7"><Minus size={13} /></IconButton><span className="mono w-12 text-center text-[10px] text-[#71888b]">1 {item.unit}</span><IconButton label={`Bestand von ${item.name} erhöhen`} onClick={() => onStockChange(item.id, 1)} className="h-7 w-7 text-[#5bd4c2]"><Plus size={13} /></IconButton></div></div>)}{filtered.length === 0 && <div className="px-5 py-16 text-center text-[11px] text-[#71888b]">Keine Frachtpositionen gefunden.</div>}</Panel></div>;
+  return <div className="space-y-5"><div className="grid gap-3 sm:grid-cols-3"><MetricCard title="Gesamtbestand" value={total.toLocaleString('de-DE')} caption={`${stock.length} Frachtpositionen verwaltet`} icon={<Boxes size={16} />} /><MetricCard title="Kapazität" value={`${capacity ? Math.round(total / capacity * 100) : 0}%`} caption="Lagerauslastung East Basin" icon={<Warehouse size={16} />} tone="blue" /><MetricCard title="Nachbestellung" value={String(reorder).padStart(2, '0')} caption="Positionen unter Mindestbestand" icon={<ClipboardList size={16} />} tone="amber" /></div><Panel><div className="flex flex-col justify-between gap-4 border-b border-[#1c292b] px-5 py-4 lg:flex-row lg:items-center"><div><div className="flex items-center gap-2 text-[#5ad0c0]"><Warehouse size={15} /><h2 className="text-[13px] font-bold text-[#dce9e7]">Frachtbestand</h2></div><p className="mt-1 text-[10px] text-[#71888b]">200 handelbare Güter · nur Stückzahl und Füllstand</p></div><div className="flex flex-wrap items-center gap-2"><label className="flex items-center gap-2 rounded-lg border border-[#253336] bg-[#0d1314] px-3 py-2 text-[10px] text-[#789194]"><Search size={13} /><span className="sr-only">Fracht suchen</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Fracht suchen" className="w-32 bg-transparent text-[#dce9e7] outline-none placeholder:text-[#60777a] sm:w-44" /></label><label className="flex items-center gap-2 rounded-lg border border-[#253336] bg-[#0d1314] px-3 py-2 text-[10px] text-[#789194]"><SlidersHorizontal size={13} /><select value={category} onChange={(event) => setCategory(event.target.value)} className="bg-transparent text-[#dce9e7] outline-none">{categories.map((item) => <option key={item} value={item} className="bg-[#0d1314]">{item}</option>)}</select></label></div></div><div className="hidden grid-cols-[1.4fr_.8fr_1.2fr] gap-4 border-b border-[#1c292b] bg-[#0c1415] px-5 py-2.5 text-[9px] font-bold uppercase tracking-[.12em] text-[#5f7779] md:grid"><span>Frachtposition</span><span>Stückzahl</span><span>Füllstand</span></div>{filtered.map((item) => <div key={item.id} data-testid={`row-stock-${item.id}`} className="grid gap-3 border-b border-[#182528] px-5 py-4 last:border-0 md:grid-cols-[1.4fr_.8fr_1.2fr] md:items-center md:gap-4"><div className="flex items-center gap-3"><div className={`flex h-8 w-8 items-center justify-center rounded-lg ${getDefinition(item.id).tone === 'amber' ? 'bg-[#342515] text-[#e4ad57]' : getDefinition(item.id).tone === 'blue' ? 'bg-[#102b39] text-[#70b6d6]' : 'bg-[#10312e] text-[#50cdbb]'}`}><Package size={14} /></div><div className="text-[11px] font-bold text-[#d8e7e4]">{item.name}</div></div><div><span className="mono text-[12px] text-[#d8e7e4]">{item.qty.toLocaleString('de-DE')}</span> <span className="text-[10px] text-[#71888b]">{item.unit}</span></div><div><div className="mb-1 flex justify-between text-[9px] text-[#71888b]"><span>{Math.round(item.qty / item.capacity * 100)}% belegt</span>{item.qty <= item.reorder && <span className="font-bold text-[#e4ad57]">Nachbestellen</span>}</div><div className="h-1.5 overflow-hidden rounded-full bg-[#172628]"><div className={`h-full rounded-full ${item.qty <= item.reorder ? 'bg-[#d99a3c]' : 'bg-[#35b8aa]'}`} style={{ width: `${Math.min(100, item.qty / item.capacity * 100)}%` }} /></div></div></div>)}{filtered.length === 0 && <div className="px-5 py-16 text-center text-[11px] text-[#71888b]">Keine Frachtpositionen gefunden.</div>}</Panel></div>;
 }
 
 function ActivityView({ items }: { items: ActivityItem[] }) {
@@ -451,7 +413,6 @@ function ActivityView({ items }: { items: ActivityItem[] }) {
 function AppShell() {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [visible, setVisible] = useState(!isFiveM());
-  const [cargo, setCargo] = useState<Cargo[]>(initialCargo);
   const [stock, setStock] = useState<Stock[]>(initialStock);
   const [liveShips, setLiveShips] = useState<Ship[]>(demoShips);
   const [treasury, setTreasury] = useState<Treasury>(defaultTreasury);
@@ -459,7 +420,6 @@ function AppShell() {
   const [activity, setActivity] = useState<ActivityItem[]>(demoActivity);
   const [refreshedAt, setRefreshedAt] = useState('gerade eben');
   const [notice, setNotice] = useState('');
-  const [scenarioRunning, setScenarioRunning] = useState(false);
 
   useEffect(() => {
     const listener = (event: MessageEvent) => {
@@ -468,18 +428,15 @@ function AppShell() {
       if (data?.action === 'close') setVisible(false);
       if (data?.action === 'stateUpdate' && data.state) {
         const next = applyServerState(data.state as ServerState);
-        setCargo(next.cargo);
         setStock(next.stock);
         setLiveShips(next.ships);
         setTreasury(next.treasury);
         setEconomy(next.economy);
         setActivity(next.activity);
         setRefreshedAt('gerade eben');
-        setScenarioRunning(false);
       }
       if (data?.action === 'actionResult') {
         setNotice(data.success ? data.message : `Aktion fehlgeschlagen: ${data.message}`);
-        setScenarioRunning(false);
         window.setTimeout(() => setNotice(''), 2600);
       }
     };
@@ -492,31 +449,9 @@ function AppShell() {
   }, []);
 
   const sendBridge = (type: string, payload: unknown) => { if (!isFiveM()) window.parent?.postMessage({ type, payload, source: 'harbor-ledger-ui' }, '*'); };
-  const updateStock = (id: string, delta: number) => {
-    setStock((items) => items.map((item) => item.id === id ? { ...item, qty: Math.max(0, Math.min(item.capacity, item.qty + delta)) } : item));
-    setCargo((items) => items.map((item) => item.id === id ? { ...item, qty: Math.max(0, item.qty + delta), status: item.qty + delta <= getDefinition(id).reorder ? 'Nachbestellen' : 'Freigegeben' } : item));
-    nuiPost(delta > 0 ? 'addCargo' : 'removeCargo', { itemId: id, amount: Math.abs(delta), note: 'Frachtlager' });
-    sendBridge('harbor-ledger:stock-adjust', { id, delta });
-    setNotice(delta > 0 ? 'Bestand erhöht' : 'Bestand verringert');
-    window.setTimeout(() => setNotice(''), 1600);
-  };
-  const updateCargo = (id: string, delta: number) => updateStock(id, delta);
   const refresh = () => { setRefreshedAt('gerade eben'); nuiPost('getState', {}); sendBridge('harbor-ledger:request-refresh', {}); setNotice('Serverstatus angefordert'); window.setTimeout(() => setNotice(''), 1800); };
   const close = () => { if (isFiveM()) nuiPost('close', {}); else setVisible(false); };
-  const runScenario = (scenario: Scenario) => {
-    setScenarioRunning(true);
-    nuiPost('simulateEconomy', { scenario });
-    if (!isFiveM()) {
-      const result = applyScenario(treasury, economy, scenario);
-      setTreasury(result.treasury);
-      setEconomy(result.economy);
-      setActivity((items) => [{ id: `scenario-${Date.now()}`, type: 'treasury', title: `Szenario ausgeführt: ${result.label}`, detail: `Marktindex auf ${result.economy.marketIndex.toFixed(1)} aktualisiert`, timestamp: Date.now() }, ...items]);
-      setScenarioRunning(false);
-    }
-    setNotice(`Szenario wird berechnet: ${scenario}`);
-    window.setTimeout(() => setNotice(''), 2200);
-  };
-  const content = activeTab === 'overview' ? <Overview cargo={cargo} stocks={stock} ships={liveShips} treasury={treasury} economy={economy} activity={activity} onScenario={runScenario} /> : activeTab === 'economy' ? <EconomyView stocks={stock} treasury={treasury} economy={economy} running={scenarioRunning} onScenario={runScenario} /> : activeTab === 'traffic' ? <TrafficView ships={liveShips} /> : activeTab === 'warehouse' ? <WarehouseView stock={stock} onStockChange={updateStock} /> : <ActivityView items={activity} />;
+  const content = activeTab === 'overview' ? <Overview stocks={stock} ships={liveShips} treasury={treasury} economy={economy} activity={activity} /> : activeTab === 'economy' ? <EconomyView stocks={stock} treasury={treasury} economy={economy} /> : activeTab === 'traffic' ? <TrafficView ships={liveShips} /> : activeTab === 'warehouse' ? <WarehouseView stock={stock} /> : <ActivityView items={activity} />;
   return <div className={`${isFiveM() && !visible ? 'hidden' : 'flex'} harbor-dark min-h-[100dvh] flex-col bg-[#050708] text-[#dce9e7] md:flex-row`}><Sidebar activeTab={activeTab} onSelect={setActiveTab} /><main className="min-w-0 flex-1"><TopBar activeTab={activeTab} onRefresh={refresh} onClose={close} refreshedAt={refreshedAt} /><div className="mx-auto max-w-[1600px] p-4 md:p-7">{content}</div></main>{notice && <div data-testid="status-notice" className="fixed bottom-5 right-5 z-30 flex max-w-[340px] items-center gap-2 rounded-lg border border-[#28534f] bg-[#0d2524] px-4 py-3 text-[11px] font-semibold text-[#dce9e7] shadow-2xl"><span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#56d6c3]" />{notice}<button type="button" aria-label="Meldung schließen" onClick={() => setNotice('')} className="ml-2 text-[#82aaa5] hover:text-white"><X size={14} /></button></div>}</div>;
 }
 

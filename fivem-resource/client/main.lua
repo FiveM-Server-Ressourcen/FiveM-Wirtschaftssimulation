@@ -53,11 +53,6 @@ RegisterNUICallback('removeCargo', function(data, cb)
     cb({ ok = true })
 end)
 
-RegisterNUICallback('simulateEconomy', function(data, cb)
-    TriggerServerEvent('harbor_ledger:server:simulateEconomy', data.scenario)
-    cb({ ok = true })
-end)
-
 AddEventHandler('onResourceStop', function(resourceName)
     if resourceName == GetCurrentResourceName() then
         SetNuiFocus(false, false)

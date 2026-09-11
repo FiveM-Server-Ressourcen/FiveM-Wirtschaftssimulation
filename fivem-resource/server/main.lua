@@ -40,7 +40,6 @@ local function defaultEconomy()
         prices = prices,
         demand = demand,
         trend = { 96.0, 98.0, 97.0, 100.0, 101.0, 103.0, 104.8 },
-        lastScenario = 'stable',
         updatedAt = now()
     }
 end
@@ -293,55 +292,6 @@ local function removeCargo(source, itemId, amount, note)
     return true
 end
 
-local function simulateEconomy(source, scenario)
-    if not canManageCargo(source) then
-        if source > 0 then
-            TriggerClientEvent('harbor_ledger:client:actionResult', source, false, 'Keine Berechtigung für die Wirtschaftssimulation.')
-        end
-        return false
-    end
-
-    local modifiers = {
-        stable = { income = 12000, expense = 5400, volume = 46000, index = 0.8, label = 'Stabile Nachfrage' },
-        growth = { income = 42000, expense = 12800, volume = 128000, index = 3.4, label = 'Handelsboom' },
-        shock = { income = -18000, expense = 36000, volume = -84000, index = -4.8, label = 'Versorgungsengpass' }
-    }
-    local modifier = modifiers[scenario]
-    if not modifier then
-        return false
-    end
-
-    state.treasury.balance = math.max(0, state.treasury.balance + modifier.income - modifier.expense)
-    state.treasury.changeToday = state.treasury.changeToday + modifier.income - modifier.expense
-    state.treasury.incomeToday = math.max(0, state.treasury.incomeToday + modifier.income)
-    state.treasury.expenseToday = math.max(0, state.treasury.expenseToday + modifier.expense)
-    table.insert(state.treasury.trend, state.treasury.balance)
-    while #state.treasury.trend > 7 do table.remove(state.treasury.trend, 1) end
-
-    state.economy.marketIndex = clamp(state.economy.marketIndex + modifier.index, 40, 180)
-    state.economy.tradeVolumeToday = math.max(0, state.economy.tradeVolumeToday + modifier.volume)
-    state.economy.taxRevenueToday = math.max(0, state.economy.taxRevenueToday + math.floor(modifier.income * 0.08))
-    state.economy.lastScenario = scenario
-    state.economy.updatedAt = now()
-    table.insert(state.economy.trend, state.economy.marketIndex)
-    while #state.economy.trend > 7 do table.remove(state.economy.trend, 1) end
-
-    for index, cargo in ipairs(Config.Cargo) do
-        local demandDelta = scenario == 'growth' and 5 or scenario == 'shock' and -7 or 1
-        local priceMultiplier = scenario == 'growth' and 1.025 or scenario == 'shock' and 0.96 or 1.008
-        state.economy.demand[cargo.id] = clamp((state.economy.demand[cargo.id] or 50) + demandDelta + (index % 3 - 1), 5, 99)
-        state.economy.prices[cargo.id] = round((state.economy.prices[cargo.id] or cargo.basePrice) * priceMultiplier, 2)
-    end
-
-    pushActivity('treasury', ('Szenario ausgeführt: %s'):format(modifier.label), ('Marktindex auf %.1f aktualisiert'):format(state.economy.marketIndex))
-    saveState()
-    broadcast()
-    if source > 0 then
-        TriggerClientEvent('harbor_ledger:client:actionResult', source, true, ('Szenario „%s“ ausgeführt.'):format(modifier.label))
-    end
-    return true
-end
-
 local function updateShips()
     for _, ship in ipairs(state.ships) do
         if ship.status == 'underway' then
@@ -401,10 +351,6 @@ end)
 
 RegisterNetEvent('harbor_ledger:server:removeCargo', function(itemId, amount, note)
     removeCargo(source, itemId, amount, note)
-end)
-
-RegisterNetEvent('harbor_ledger:server:simulateEconomy', function(scenario)
-    simulateEconomy(source, scenario)
 end)
 
 exports('AddCargo', function(itemId, amount, note)
