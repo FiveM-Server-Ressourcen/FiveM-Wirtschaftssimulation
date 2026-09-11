@@ -11,12 +11,37 @@ local function round(value, decimals)
 end
 
 local function defaultInventory()
+    local inventory = {}
+    for index, cargo in ipairs(Config.Cargo) do
+        local quantity = 22 + ((index * 17) % math.max(30, cargo.capacity - 20))
+        inventory[cargo.id] = {
+            quantity = math.min(quantity, cargo.capacity),
+            capacity = cargo.capacity,
+            reserved = math.floor(quantity * 0.14)
+        }
+    end
+    return inventory
+end
+
+local function defaultEconomy()
+    local prices = {}
+    local demand = {}
+    for index, cargo in ipairs(Config.Cargo) do
+        prices[cargo.id] = cargo.basePrice
+        demand[cargo.id] = math.min(95, 42 + ((index * 13) % 48))
+    end
+
     return {
-        electronics = { quantity = 1240, capacity = 2000, reserved = 380 },
-        fuel = { quantity = 860, capacity = 1200, reserved = 140 },
-        steel = { quantity = 640, capacity = 900, reserved = 220 },
-        food = { quantity = 1830, capacity = 2500, reserved = 460 },
-        textiles = { quantity = 420, capacity = 800, reserved = 80 }
+        marketIndex = 104.8,
+        tradeVolumeToday = 1840000,
+        importsToday = 1290000,
+        exportsToday = 550000,
+        taxRevenueToday = 18400,
+        prices = prices,
+        demand = demand,
+        trend = { 96.0, 98.0, 97.0, 100.0, 101.0, 103.0, 104.8 },
+        lastScenario = 'stable',
+        updatedAt = now()
     }
 end
 
@@ -27,60 +52,60 @@ local function defaultShips()
             name = 'Atlas Meridian',
             code = 'AM-204',
             status = 'underway',
-            cargo = 'electronics',
-            cargoLabel = 'Elektronik',
+            cargo = 'cargo-001',
+            cargoLabel = 'Elektronikmodule 001',
             from = 'terminal',
             to = 'lsia',
             progress = 0.62,
             etaMinutes = 18,
             lat = 33.8630,
             lng = -118.3340,
-            manifest = { electronics = 620, steel = 80 }
+            manifest = { ['cargo-001'] = 620, ['cargo-003'] = 80 }
         },
         {
             id = 'pacific-dawn',
             name = 'Pacific Dawn',
             code = 'PD-088',
             status = 'docked',
-            cargo = 'fuel',
-            cargoLabel = 'Treibstoff',
+            cargo = 'cargo-002',
+            cargoLabel = 'Treibstoff 002',
             from = 'paleto',
             to = 'terminal',
             progress = 1.0,
             etaMinutes = 0,
             lat = 33.7396,
             lng = -118.2620,
-            manifest = { fuel = 420 }
+            manifest = { ['cargo-002'] = 420 }
         },
         {
             id = 'sierra-luce',
             name = 'Sierra Luce',
             code = 'SL-631',
             status = 'underway',
-            cargo = 'food',
-            cargoLabel = 'Lebensmittel',
+            cargo = 'cargo-004',
+            cargoLabel = 'Frischware 004',
             from = 'eastsandy',
             to = 'paleto',
             progress = 0.28,
             etaMinutes = 41,
             lat = 33.9673,
             lng = -118.2740,
-            manifest = { food = 940, textiles = 130 }
+            manifest = { ['cargo-004'] = 940, ['cargo-005'] = 130 }
         },
         {
             id = 'northstar-9',
             name = 'Northstar 9',
             code = 'NS-419',
             status = 'anchored',
-            cargo = 'steel',
-            cargoLabel = 'Stahl',
+            cargo = 'cargo-003',
+            cargoLabel = 'Baustahl 003',
             from = 'lsia',
             to = 'eastsandy',
             progress = 0.86,
             etaMinutes = 9,
             lat = 33.9250,
             lng = -118.2520,
-            manifest = { steel = 560 }
+            manifest = { ['cargo-003'] = 560 }
         }
     }
 end
@@ -96,6 +121,7 @@ local function defaultState()
             trend = { 1080000, 1110000, 1090000, 1160000, 1190000, 1170000, 1250000 }
         },
         inventory = defaultInventory(),
+        economy = defaultEconomy(),
         ships = defaultShips(),
         activity = {
             { id = 'boot-1', type = 'system', title = 'Harbor Ledger gestartet', detail = 'Wirtschaftssimulation ist aktiv', timestamp = now() },
@@ -126,6 +152,40 @@ local function loadState()
     return initial
 end
 
+local function migrateState(loaded)
+    loaded.treasury = loaded.treasury or defaultState().treasury
+    loaded.activity = loaded.activity or {}
+    loaded.ships = loaded.ships or defaultShips()
+    loaded.economy = loaded.economy or defaultEconomy()
+    loaded.economy.prices = loaded.economy.prices or {}
+    loaded.economy.demand = loaded.economy.demand or {}
+    loaded.economy.trend = loaded.economy.trend or { 96.0, 98.0, 97.0, 100.0, 101.0, 103.0, loaded.economy.marketIndex or 104.8 }
+
+    local legacyIds = { 'electronics', 'fuel', 'steel', 'food', 'textiles' }
+    local existing = loaded.inventory or {}
+    local inventory = {}
+
+    for index, cargo in ipairs(Config.Cargo) do
+        local old = existing[cargo.id]
+        if not old and index <= #legacyIds then
+            old = existing[legacyIds[index]]
+        end
+
+        local fallbackQuantity = 22 + ((index * 17) % math.max(30, cargo.capacity - 20))
+        inventory[cargo.id] = {
+            quantity = math.max(0, math.min(cargo.capacity, tonumber(old and old.quantity) or fallbackQuantity)),
+            capacity = cargo.capacity,
+            reserved = math.max(0, math.min(tonumber(old and old.reserved) or math.floor(fallbackQuantity * 0.14), cargo.capacity))
+        }
+        loaded.economy.prices[cargo.id] = tonumber(loaded.economy.prices[cargo.id]) or cargo.basePrice
+        loaded.economy.demand[cargo.id] = tonumber(loaded.economy.demand[cargo.id]) or math.min(95, 42 + ((index * 13) % 48))
+    end
+
+    loaded.inventory = inventory
+    loaded.version = 2
+    return loaded
+end
+
 local function getCargoDefinition(itemId)
     for _, item in ipairs(Config.Cargo) do
         if item.id == itemId then
@@ -137,6 +197,10 @@ end
 
 local function canManageCargo(source)
     return source == 0 or IsPlayerAceAllowed(source, Config.AdminAce)
+end
+
+local function clamp(value, minimum, maximum)
+    return math.max(minimum, math.min(maximum, value))
 end
 
 local function pushActivity(kind, title, detail)
@@ -229,6 +293,55 @@ local function removeCargo(source, itemId, amount, note)
     return true
 end
 
+local function simulateEconomy(source, scenario)
+    if not canManageCargo(source) then
+        if source > 0 then
+            TriggerClientEvent('harbor_ledger:client:actionResult', source, false, 'Keine Berechtigung für die Wirtschaftssimulation.')
+        end
+        return false
+    end
+
+    local modifiers = {
+        stable = { income = 12000, expense = 5400, volume = 46000, index = 0.8, label = 'Stabile Nachfrage' },
+        growth = { income = 42000, expense = 12800, volume = 128000, index = 3.4, label = 'Handelsboom' },
+        shock = { income = -18000, expense = 36000, volume = -84000, index = -4.8, label = 'Versorgungsengpass' }
+    }
+    local modifier = modifiers[scenario]
+    if not modifier then
+        return false
+    end
+
+    state.treasury.balance = math.max(0, state.treasury.balance + modifier.income - modifier.expense)
+    state.treasury.changeToday = state.treasury.changeToday + modifier.income - modifier.expense
+    state.treasury.incomeToday = math.max(0, state.treasury.incomeToday + modifier.income)
+    state.treasury.expenseToday = math.max(0, state.treasury.expenseToday + modifier.expense)
+    table.insert(state.treasury.trend, state.treasury.balance)
+    while #state.treasury.trend > 7 do table.remove(state.treasury.trend, 1) end
+
+    state.economy.marketIndex = clamp(state.economy.marketIndex + modifier.index, 40, 180)
+    state.economy.tradeVolumeToday = math.max(0, state.economy.tradeVolumeToday + modifier.volume)
+    state.economy.taxRevenueToday = math.max(0, state.economy.taxRevenueToday + math.floor(modifier.income * 0.08))
+    state.economy.lastScenario = scenario
+    state.economy.updatedAt = now()
+    table.insert(state.economy.trend, state.economy.marketIndex)
+    while #state.economy.trend > 7 do table.remove(state.economy.trend, 1) end
+
+    for index, cargo in ipairs(Config.Cargo) do
+        local demandDelta = scenario == 'growth' and 5 or scenario == 'shock' and -7 or 1
+        local priceMultiplier = scenario == 'growth' and 1.025 or scenario == 'shock' and 0.96 or 1.008
+        state.economy.demand[cargo.id] = clamp((state.economy.demand[cargo.id] or 50) + demandDelta + (index % 3 - 1), 5, 99)
+        state.economy.prices[cargo.id] = round((state.economy.prices[cargo.id] or cargo.basePrice) * priceMultiplier, 2)
+    end
+
+    pushActivity('treasury', ('Szenario ausgeführt: %s'):format(modifier.label), ('Marktindex auf %.1f aktualisiert'):format(state.economy.marketIndex))
+    saveState()
+    broadcast()
+    if source > 0 then
+        TriggerClientEvent('harbor_ledger:client:actionResult', source, true, ('Szenario „%s“ ausgeführt.'):format(modifier.label))
+    end
+    return true
+end
+
 local function updateShips()
     for _, ship in ipairs(state.ships) do
         if ship.status == 'underway' then
@@ -274,7 +387,8 @@ local function updateShips()
     broadcast()
 end
 
-state = loadState()
+state = migrateState(loadState())
+saveState()
 math.randomseed(now())
 
 RegisterNetEvent('harbor_ledger:server:requestState', function()
@@ -287,6 +401,10 @@ end)
 
 RegisterNetEvent('harbor_ledger:server:removeCargo', function(itemId, amount, note)
     removeCargo(source, itemId, amount, note)
+end)
+
+RegisterNetEvent('harbor_ledger:server:simulateEconomy', function(scenario)
+    simulateEconomy(source, scenario)
 end)
 
 exports('AddCargo', function(itemId, amount, note)
