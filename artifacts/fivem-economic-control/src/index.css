@@ -178,3 +178,122 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; }
 }
+
+/* Harbor Ledger dark command-center skin */
+.harbor-dark {
+  --background: 0 0% 2%;
+  --foreground: 180 12% 91%;
+  --border: 180 10% 15%;
+  --input: 180 10% 17%;
+  --ring: 176 62% 46%;
+  --card: 0 0% 5%;
+  --card-foreground: 180 12% 91%;
+  --card-border: 180 10% 15%;
+  --muted: 180 9% 10%;
+  --muted-foreground: 180 8% 59%;
+  --sidebar: 0 0% 1%;
+  --sidebar-border: 180 10% 12%;
+  --sidebar-primary: 176 62% 44%;
+  --sidebar-accent: 180 12% 9%;
+}
+
+.harbor-dark [class~="bg-[#f8fbfb]"],
+.harbor-dark [class~="bg-[#f7fbfa]"],
+.harbor-dark [class~="bg-[#f5f9f9]"],
+.harbor-dark [class~="bg-[#f3f8f7]"] {
+  background-color: #080a0b !important;
+}
+.harbor-dark [class~="bg-[#eef5f4]"] { background-color: #101b1c !important; }
+.harbor-dark [class~="bg-[#dcefea]"],
+.harbor-dark [class~="bg-[#d7efeb]"],
+.harbor-dark [class~="bg-[#e7f0ee]"] { background-color: #10312e !important; }
+.harbor-dark [class~="bg-[#fff0d5]"],
+.harbor-dark [class~="bg-[#fff0cf]"] { background-color: #332514 !important; }
+.harbor-dark [class~="bg-[#e0edf3]"],
+.harbor-dark [class~="bg-[#dcebf4]"] { background-color: #102832 !important; }
+.harbor-dark [class~="bg-[#e4eaee]"] { background-color: #172124 !important; }
+.harbor-dark [class~="bg-[#f8e0dd]"] { background-color: #351d1b !important; }
+.harbor-dark [class~="bg-[#deeaeb]"],
+.harbor-dark [class~="bg-[#e0eaeb]"] { background-color: #162326 !important; }
+.harbor-dark [class~="bg-white"] { background-color: #0d1112 !important; }
+.harbor-dark [class~="bg-[#238f86]"] { background-color: #1d8279 !important; }
+.harbor-dark [class~="bg-[#193f46]"] { background-color: #0b2528 !important; }
+.harbor-dark [class~="bg-[#19363d]"] { background-color: #0b1e20 !important; }
+.harbor-dark [class~="bg-[#24434a]"] { background-color: #102d2f !important; }
+.harbor-dark [class~="bg-[#1c363d]"] { background-color: #0c2022 !important; }
+
+.harbor-dark [class~="border-[#d3e0e2]"],
+.harbor-dark [class~="border-[#d1e0e2]"],
+.harbor-dark [class~="border-[#dbe6e7]"],
+.harbor-dark [class~="border-[#e3ebec]"],
+.harbor-dark [class~="border-[#d8e2e3]"],
+.harbor-dark [class~="border-[#d4e1e2]"],
+.harbor-dark [class~="border-[#d7e3e4]"] {
+  border-color: #1d2a2c !important;
+}
+.harbor-dark [class~="border-[#c6dfdb]"] { border-color: #245550 !important; }
+.harbor-dark [class~="border-[#2b4a50]"] { border-color: #1d3a3d !important; }
+
+.harbor-dark [class~="text-[#19353d]"],
+.harbor-dark [class~="text-[#20414a]"],
+.harbor-dark [class~="text-[#203f47]"],
+.harbor-dark [class~="text-[#29474e]"],
+.harbor-dark [class~="text-[#24444b]"] { color: #e5efee !important; }
+.harbor-dark [class~="text-[#789397]"],
+.harbor-dark [class~="text-[#82999c]"],
+.harbor-dark [class~="text-[#81979a]"],
+.harbor-dark [class~="text-[#849a9d]"],
+.harbor-dark [class~="text-[#86a0a3]"],
+.harbor-dark [class~="text-[#91a5a8]"],
+.harbor-dark [class~="text-[#94a6a8]"],
+.harbor-dark [class~="text-[#709095]"] { color: #7e9295 !important; }
+.harbor-dark [class~="text-[#238b82]"],
+.harbor-dark [class~="text-[#24877f]"],
+.harbor-dark [class~="text-[#267f77]"],
+.harbor-dark [class~="text-[#247f76]"],
+.harbor-dark [class~="text-[#2b8f87]"],
+.harbor-dark [class~="text-[#288f88]"] { color: #43c4b5 !important; }
+.harbor-dark [class~="text-[#a96d18]"],
+.harbor-dark [class~="text-[#a86d18]"],
+.harbor-dark [class~="text-[#a36d1c]"],
+.harbor-dark [class~="text-[#ac731e]"] { color: #dfa64d !important; }
+.harbor-dark [class~="text-[#467c94]"] { color: #62a8c8 !important; }
+.harbor-dark [class~="text-[#59787e]"],
+.harbor-dark [class~="text-[#617d82]"],
+.harbor-dark [class~="text-[#668186]"],
+.harbor-dark [class~="text-[#607681]"] { color: #93aeb0 !important; }
+.harbor-dark [class~="text-[#86a6aa]"],
+.harbor-dark [class~="text-[#75999d]"],
+.harbor-dark [class~="text-[#9db6b9]"] { color: #89a8aa !important; }
+.harbor-dark [class~="text-[#56757b]"] { color: #9ab0b2 !important; }
+.harbor-dark [class~="text-[#a84d43]"],
+.harbor-dark [class~="text-[#a34941]"],
+.harbor-dark [class~="text-[#9f3931]"] { color: #e17d70 !important; }
+
+.harbor-dark main > header {
+  background-color: #080a0b !important;
+  border-color: #1b282a !important;
+}
+.harbor-dark section {
+  background-color: #0c1011 !important;
+  border-color: #1d2a2c !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .2) !important;
+}
+.harbor-dark input { color: #e5efee; }
+.harbor-dark input::placeholder { color: #617678; }
+.harbor-dark .leaflet-tile-pane { filter: brightness(.48) saturate(.7) contrast(1.2); }
+.harbor-dark .leaflet-container { background: #071113; }
+.harbor-dark .leaflet-control-zoom a {
+  background: #0c1516;
+  border-color: #26383a;
+  color: #a7c3c3;
+}
+.harbor-dark .leaflet-control-attribution { background: rgba(8, 12, 13, .86) !important; color: #7e9295; }
+.harbor-dark .leaflet-control-attribution a { color: #43c4b5; }
+.harbor-dark .ship-tooltip,
+.harbor-dark .port-tooltip {
+  background: #0b1213;
+  border-color: #2b4446;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
+  color: #dce9e7;
+}
