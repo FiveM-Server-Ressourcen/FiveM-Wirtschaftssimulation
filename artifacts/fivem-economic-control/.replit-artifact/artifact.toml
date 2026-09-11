@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Harbor Ledger"
+description = "Eine moderne Leitstelle für eine FiveM-Wirtschaftssimulation mit Staatskonto, Frachtschiffen, Hafenkarte und Lagerverwaltung."
+version = "1.0.0"
+id = "artifacts/fivem-economic-control"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23845
+
+[services.development]
+run = "pnpm --filter @workspace/fivem-economic-control run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/fivem-economic-control", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/fivem-economic-control/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23845"
+BASE_PATH = "/"

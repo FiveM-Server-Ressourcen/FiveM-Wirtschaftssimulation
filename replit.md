@@ -1,10 +1,12 @@
-# [Project name]
+# Harbor Ledger · FiveM Wirtschaftssimulation
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Harbor Ledger ist eine FiveM-Resource für staatliche Finanzen, Frachtschiffe, Hafenrouten und ein serverseitig geschütztes Hafenlager.
 
 ## Run & Operate
 
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/fivem-economic-control run dev` — run the Harbor-Ledger-Weboberfläche
+- `pnpm --filter @workspace/fivem-economic-control run build` — build the NUI bundle
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
@@ -22,23 +24,35 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `fivem-resource/` — installierbare FiveM-Resource mit `fxmanifest.lua`, Lua-Serverlogik, Client-NUI-Callbacks, Persistenz und Vue-Referenzkomponente
+- `artifacts/fivem-economic-control/` — React/Vite-NUI mit Dashboard, Schiffsansicht, Karte und Lagerverwaltung
+- `artifacts/fivem-economic-control/src/App.tsx` — UI und NUI-Bridge
+- `fivem-resource/server/main.lua` — Staatskonto, Lager-Events/Exports, Persistenz und Schiffs-Simulation
+- `fivem-resource/config.lua` — Häfen, Waren, ACE-Rechte und Tick-Intervalle
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- React ist die laufende FiveM-NUI; die Vue-Datei in `fivem-resource/web-vue/` ist eine getrennte, wiederverwendbare Lager-Ansicht statt eines schwer wartbaren Framework-Mix im selben Bundle.
+- Der Server ist autoritativ: Lagerzugänge und -abgänge werden über ACE-Rechte, Whitelist-Waren, Mengen- und Kapazitätsgrenzen geprüft.
+- Der Spielstand wird als JSON in der Resource gespeichert, damit der erste Betrieb ohne zusätzliche Datenbank auskommt und Zustände nach Neustarts erhalten bleiben.
+- Die Weboberfläche nutzt im Browser Demo-Daten, wechselt in FiveM automatisch auf NUI-Callbacks und empfängt Updates über `SendNUIMessage`.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- `/harborledger` oder `F7` öffnet die Leitstelle.
+- Übersicht mit Staatskonto, Trend, aktiven Frachtschiffen, Route-Karte und Manifesten.
+- Flottenansicht mit Status, ETA und laufender Position.
+- Hafenlager mit Bestands-, Kapazitäts- und Nachbestell-Anzeige sowie Ein-/Auslagerung.
+- Server-Events `harbor_ledger:server:addCargo` / `removeCargo` und Exports `AddCargo` / `RemoveCargo` für andere Resources.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Oberfläche und Dokumentation sind für einen deutschsprachigen FiveM-Server gedacht.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Nach einem UI-Build muss `artifacts/fivem-economic-control/dist/public/` nach `fivem-resource/web/` kopiert werden, bevor die Resource auf dem FiveM-Server aktualisiert wird.
+- Für Lageränderungen in `server.cfg` `add_ace group.admin harborledger.admin allow` setzen.
 
 ## Pointers
 
